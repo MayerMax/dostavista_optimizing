@@ -1,4 +1,5 @@
 import json
+import numpy as np
 
 from data_wrappers import Courier, Order
 from collections import namedtuple
@@ -13,6 +14,9 @@ class OneStepGreedy:
 
         self._couriers = [Courier(x) for x in data['couriers']]
         self._orders = [Order(x) for x in data['orders']]
+
+        print(len(self._couriers))
+        print(len(self._orders))
 
         self._orders_map = {order.order_id: order for order in self._orders}
         self._couriers_map = {courier.id: courier for courier in self._couriers}
@@ -57,7 +61,7 @@ class OneStepGreedy:
         if not arrives_to_dropoff_point:
             return float('-inf')
 
-        return 2 * (arrives_to_dropoff_point - initial_time)
+        return order.payment - 2 * (arrives_to_dropoff_point - initial_time)
 
     def solve(self):
         completed_orders = []
@@ -65,11 +69,13 @@ class OneStepGreedy:
 
         while True and len(self._orders) > 0:
             found_positive_revenues = [self._find_optimal_courier_step(c) for c in self._couriers]
-            found_positive_revenues.sort(key=lambda x: x.revenue, reverse=True)
-            if found_positive_revenues[0].revenue < 0:  # most optimal revenue is negative
+
+            all_revenues = [x.revenue for x in found_positive_revenues]
+            max_index = np.argmax(all_revenues)
+            if found_positive_revenues[max_index].revenue < 0:
                 break
 
-            total_revenue += found_positive_revenues[0].revenue
+            total_revenue += found_positive_revenues[max_index].revenue
 
             cur_order_info = found_positive_revenues[0]
             courier = self._couriers_map[cur_order_info.courier_id]
@@ -109,9 +115,11 @@ class OneStepGreedy:
             return CompletedOrderInfo(courier.id, -1, float('-inf'))
 
         variants.sort(key=lambda x: x.revenue, reverse=True)
-        if variants[0].revenue < 0:  # revenue at most optimal point
+        revenues = [x.revenue for x in variants]
+        max_index = np.argmax(revenues)
+        if variants[max_index].revenue < 0:
             return CompletedOrderInfo(courier.id, -1, float('-inf'))
-        return variants[0]
+        return variants[max_index]
 
 
 if __name__ == '__main__':

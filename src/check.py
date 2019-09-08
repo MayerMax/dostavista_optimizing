@@ -142,8 +142,8 @@ def is_depot_point(point_id):
 
 if __name__ == '__main__':
     example_dir = os.path.dirname(os.path.abspath(__file__)) + '/../example'
-    input_file = example_dir + '/input.json'
-    output_file = example_dir + '/output.json'
+    input_file = example_dir + '/contest_input.json'
+    output_file = example_dir + '/contest_output_greedy_by_user.json'
     print(input_file)
 
     # if len(sys.argv) > 2:
