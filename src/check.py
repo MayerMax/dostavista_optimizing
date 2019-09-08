@@ -44,14 +44,17 @@ def main(input_file, output_file):
                 visit_time = point['order_time'][order_id]
             # Курьер забрал заказ, удаляем информацию о том, с какого времени заказ находится в этой точке
             point.pop('order_time', None)
+            courier['goods'].append(order_id)
         elif action == 'dropoff':
             # Если point_id, не id склада или id точки dropoff заказа order_id, то ошибка (курьер привез заказ не туда)
             if not is_depot_point(point_id) and (point_id != order['dropoff_point_id']):
                 raise Exception('Cant dropoff')
-
+            if order_id not in courier['goods']:
+                raise Exception('Illegal dropoff operation')
             # Добавляем информацию о времени появления заказа на точке
             point['order_time'] = {}
             point['order_time'][order_id] = visit_time
+            courier['goods'].remove(order_id)
         else:
             raise Exception('Unknown action')
 
@@ -110,6 +113,7 @@ def load_data(file):
         couriers[courierData['courier_id']] = {
             'location': [courierData['location_x'], courierData['location_y']],
             'time': 360,
+            'goods': [],
         }
     for orderData in input_data['orders']:
         points[orderData['pickup_point_id']] = {

@@ -78,13 +78,18 @@ foreach ($events as $step => $event) {
         }
         // Курьер забрал заказ, удаляем информацию о том, с какого времени заказ находится в этой точке
         unset($point['order_time'][$orderId]);
+        $courier['goods'][$orderId] = $orderId;
     } elseif ($action == 'dropoff') {
         // Если PointId, не id склада или id точки dropoff заказа OrderId, то ошибка (курьер привез заказ не туда)
         if (!isDepotPoint($pointId) && ($pointId != $order['dropoff_point_id'])) {
             throw new Exception('Cant dropoff');
         }
+        if (!isset($courier['goods'][$orderId])) {
+            throw new Exception('Illegal dropoff operation');
+        }
         // Добавляем информацию о времени появления заказа на точке
         $point['order_time'][$orderId] = $visitTime;
+        unset($courier['goods'][$orderId]);
     } else {
         throw new Exception('Unknown action');
     }
@@ -158,6 +163,7 @@ function loadData(string $file): array {
         $couriers[$courierData['courier_id']] = [
             'location' => [$courierData['location_x'], $courierData['location_y']],
             'time'     => 360, // Все курьеры начинают работу в 06:00
+            'goods'    => [],
         ];
     }
     foreach ($inputData['orders'] as $orderData) {
