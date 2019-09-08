@@ -1,6 +1,5 @@
 import json
 import random
-random.seed(1000)
 
 from data_wrappers import Courier, Order
 from collections import namedtuple
@@ -9,14 +8,17 @@ CompletedOrderInfo = namedtuple('OrderInfo', ['courier_id', 'order_id', 'revenue
 
 
 def calculate_manhattan_dist(order: Order):
-    return abs(order.pickup_location_x - order.dropoff_location_x) + abs(order.pickup_location_y - order.dropoff_location_y)
+    return abs(order.pickup_location_x - order.dropoff_location_x) + abs(
+        order.pickup_location_y - order.dropoff_location_y)
 
-class GreedyByUser:
+
+class GreedyByUserAtN:
     def __init__(self, data_path):
         with open(data_path) as f:
             data = json.loads(f.read())
 
         self._orders_map = {order.order_id: order for order in [Order(x) for x in data['orders']]}
+        print(len(self._orders_map))
 
         self._couriers = [Courier(x) for x in data['couriers']]
         random.shuffle(self._couriers)
@@ -25,10 +27,15 @@ class GreedyByUser:
 
     @staticmethod
     def time_when_picks_up(courier: Courier, order: Order):
+        if not courier.get_current_time():
+            return None
+
         if courier.get_current_time() > order.pickup_to:
             return None
+
         arrives_to_point_at = courier.get_current_time() + 10 + abs(courier.location_x - order.pickup_location_x) + abs(
             courier.location_y - order.pickup_location_y)
+
         if arrives_to_point_at > order.pickup_to:
             return None
         if arrives_to_point_at < order.pickup_from:
@@ -37,16 +44,18 @@ class GreedyByUser:
 
     @staticmethod
     def time_when_dropoffs_of(courier_actual_time: int, order: Order):
+        if not courier_actual_time:
+            return None
         if courier_actual_time > order.dropoff_to:
             return None
 
         arrives_to_point_at = courier_actual_time + 10 + abs(order.pickup_location_x - order.dropoff_location_x) + abs(
             order.pickup_location_y - order.dropoff_location_y)
 
-        if arrives_to_point_at >= order.dropoff_to:
+        if arrives_to_point_at > order.dropoff_to:
             return None
 
-        if arrives_to_point_at <= order.dropoff_from:
+        if arrives_to_point_at < order.dropoff_from:
             arrives_to_point_at += order.dropoff_from - arrives_to_point_at
         return arrives_to_point_at
 
@@ -77,34 +86,46 @@ class GreedyByUser:
     def _find_courier_path(self, courier: Courier):
         paths = []
         answer = []
-        was_negative = False
+
         while True:
             possible_revenues = {key: self.revenue_from_completing_order(courier, self._orders_map[key]) for key in
                                  self._orders_map}
-            max_revenue_id = None
+            constructed_path = []
             max_revenue_value = float('-inf')
 
             for key in possible_revenues:
-                if possible_revenues[key] > max_revenue_value:
-                    max_revenue_id = key
-                    max_revenue_value = possible_revenues[key]
+                print(key)
+                order = self._orders_map[key]
+                revenue_from_point = possible_revenues[key]
+                second_point_id, second_point_revenue = self._simulate_2nd_transition(courier, order)
+                if not second_point_revenue:
+                    continue
 
-            if max_revenue_value <= 0:
+                found_revenue = max(revenue_from_point + second_point_revenue, revenue_from_point)
+                if found_revenue > max_revenue_value:
+                    if found_revenue == revenue_from_point + second_point_revenue:
+                        constructed_path = [key, second_point_id]
+
+                    else:
+                        constructed_path = [key]
+
+                    max_revenue_value = found_revenue
+
+            if max_revenue_value < 0:
                 break
-            #
-            if max_revenue_value <= 0 and max_revenue_value == float('-inf') :
-                break
 
-            if max_revenue_value <= 0 and not was_negative:
-                was_negative = True
+            if constructed_path:
+                first_order = self._orders_map.pop(constructed_path[0])
+                second_order = None
+                if len(constructed_path) > 1:
+                    second_order = self._orders_map.pop(constructed_path[1])
 
-            new_order = self._orders_map.pop(max_revenue_id)
-            arrives_to_dropoff_point = self.time_when_dropoffs_of(self.time_when_picks_up(courier, new_order),
-                                                                  new_order)
-            courier.update_current_time(arrives_to_dropoff_point)
-            courier.update_current_pos(new_order.dropoff_location_x, new_order.dropoff_location_y)
+                self._make_courier_transition(courier, first_order)
+                paths.append(first_order)
 
-            paths.append(new_order)
+                if second_order:
+                    self._make_courier_transition(courier, second_order)
+                    paths.append(second_order)
 
         for order in paths:
             answer.append({
@@ -123,8 +144,43 @@ class GreedyByUser:
 
         return answer
 
+    def _make_courier_transition(self, courier, order):
+        arrives_to_dropoff_point = self.time_when_dropoffs_of(self.time_when_picks_up(courier, order),
+                                                              order)
+        courier.update_current_time(arrives_to_dropoff_point)
+        courier.update_current_pos(order.dropoff_location_x, order.dropoff_location_y)
+
+    def _simulate_2nd_transition(self, courier, found_order: Order):
+        courier_initial_time = courier.get_current_time()
+        courier_initial_x = courier.location_x
+        courier_initial_y = courier.location_y
+
+        if not courier.get_current_time():
+            return float('-inf'), None
+
+        self._make_courier_transition(courier, found_order)
+
+        new_possible_revenues = {key: self.revenue_from_completing_order(courier, self._orders_map[key]) for key in
+                                 self._orders_map if key != found_order.order_id}
+
+        max_revenue_id = None
+        max_revenue_value = float('-inf')
+
+        for key in new_possible_revenues:
+            if new_possible_revenues[key] > max_revenue_value:
+                max_revenue_id = key
+                max_revenue_value = new_possible_revenues[key]
+
+        courier.update_current_time(courier_initial_time)
+        courier.update_current_pos(courier_initial_x, courier_initial_y)
+
+        if max_revenue_value < 0:
+            return float('-inf'), None
+
+        return max_revenue_id, max_revenue_value
+
 
 if __name__ == '__main__':
-    solver = GreedyByUser('../example/contest_input.json')
-    with open('../example/contest_output_greedy_by_user_2.json', 'w') as outfile:
+    solver = GreedyByUserAtN('../example/input.json')
+    with open('../example/output.json', 'w') as outfile:
         json.dump(solver.solve(), outfile)

@@ -4,6 +4,9 @@ import json
 import os
 import sys
 
+from solutions.greedy_by_user import GreedyByUser
+
+
 def main(input_file, output_file):
     print('Input file: ' + input_file)
     print('Output file: ' + output_file)
@@ -143,13 +146,11 @@ def is_depot_point(point_id):
 if __name__ == '__main__':
     example_dir = os.path.dirname(os.path.abspath(__file__)) + '/../example'
     input_file = example_dir + '/contest_input.json'
-    output_file = example_dir + '/contest_output_greedy_by_user.json'
-    print(input_file)
+    output_file = example_dir + '/contest_output_greedy_by_user_2.json'
 
-    # if len(sys.argv) > 2:
-    #     input_file = sys.argv[1]
-    #     output_file = sys.argv[2]
-    #
+    solver = GreedyByUser(input_file)
+
+    with open(output_file, 'w') as outfile:
+        json.dump(solver.solve(), outfile)
+
     main(input_file, output_file)
-
-# 2438
