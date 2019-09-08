@@ -144,8 +144,12 @@ if __name__ == '__main__':
     example_dir = os.path.dirname(os.path.abspath(__file__)) + '/../example'
     input_file = example_dir + '/input.json'
     output_file = example_dir + '/output.json'
-    if len(sys.argv) > 2:
-        input_file = sys.argv[1]
-        output_file = sys.argv[2]
+    print(input_file)
 
+    # if len(sys.argv) > 2:
+    #     input_file = sys.argv[1]
+    #     output_file = sys.argv[2]
+    #
     main(input_file, output_file)
+
+# 2438
